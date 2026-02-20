@@ -569,21 +569,21 @@
           <div class="input-group">
             <div class="input-wrap">
               <label class="input-label">Word A</label>
-              <input type="text" id="sim-word1" placeholder="king" value="king"/>
+              <input type="text" id="sim-word1" placeholder="game" value="game"/>
             </div>
             <div class="input-wrap">
               <label class="input-label">Word B</label>
-              <input type="text" id="sim-word2" placeholder="queen" value="queen"/>
+              <input type="text" id="sim-word2" placeholder="player" value="player"/>
             </div>
             <button class="btn" onclick="computeSimilarity()">Compute</button>
           </div>
           <div class="suggest-row">
             <span style="font-size:9px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-right:4px;">Try:</span>
-            <button class="suggest-btn" onclick="setSim('king','queen')">king/queen</button>
+            <button class="suggest-btn" onclick="setSim('game','player')">game/player</button>
             <button class="suggest-btn" onclick="setSim('music','album')">music/album</button>
             <button class="suggest-btn" onclick="setSim('dog','cat')">dog/cat</button>
             <button class="suggest-btn" onclick="setSim('war','battle')">war/battle</button>
-            <button class="suggest-btn" onclick="setSim('king','guitar')">king/guitar</button>
+            <button class="suggest-btn" onclick="setSim('boy','guitar')">boy/guitar</button>
           </div>
           <div id="sim-error" class="error-msg"></div>
         </div>
@@ -656,7 +656,7 @@
       </div>
       <div class="suggest-row">
         <span style="font-size:9px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-right:4px;">Try:</span>
-        <button class="suggest-btn" onclick="setNN('king')">king</button>
+        <button class="suggest-btn" onclick="setNN('man')">man</button>
         <button class="suggest-btn" onclick="setNN('music')">music</button>
         <button class="suggest-btn" onclick="setNN('war')">war</button>
         <button class="suggest-btn" onclick="setNN('game')">game</button>
@@ -680,18 +680,18 @@
         With more training epochs, the model's analogical reasoning becomes more accurate.
       </p>
       <div class="equation" id="analogy-eq">
-        <div class="eq-word" style="background:rgba(79,156,249,0.1);border:1px solid var(--accent);" id="eq-a">king</div>
+        <div class="eq-word" style="background:rgba(79,156,249,0.1);border:1px solid var(--accent);" id="eq-a">video</div>
         <div class="eq-op">−</div>
-        <div class="eq-word" style="background:rgba(124,58,237,0.1);border:1px solid var(--accent2);" id="eq-b">man</div>
+        <div class="eq-word" style="background:rgba(124,58,237,0.1);border:1px solid var(--accent2);" id="eq-b">mtv</div>
         <div class="eq-op">+</div>
-        <div class="eq-word" style="background:rgba(16,185,129,0.1);border:1px solid var(--accent3);" id="eq-c">woman</div>
+        <div class="eq-word" style="background:rgba(16,185,129,0.1);border:1px solid var(--accent3);" id="eq-c">music</div>
         <div class="eq-op">≈</div>
         <div class="eq-word" style="background:rgba(245,158,11,0.1);border:1px solid var(--accent4);" id="eq-result">?</div>
       </div>
       <div class="input-group">
         <div class="input-wrap">
           <label class="input-label" style="color:var(--accent);">Word A</label>
-          <input type="text" id="an-a" placeholder="king" value="king" oninput="updateEqDisplay()"/>
+          <input type="text" id="an-a" placeholder="player" value="player" oninput="updateEqDisplay()"/>
         </div>
         <div class="input-wrap">
           <label class="input-label" style="color:var(--accent2);">Word B (subtract)</label>
@@ -705,7 +705,7 @@
       </div>
       <div class="suggest-row">
         <span style="font-size:9px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-right:4px;">Try:</span>
-        <button class="suggest-btn" onclick="setAnalogy('king','man','woman')">king−man+woman</button>
+        <button class="suggest-btn" onclick="setAnalogy('music','video','mtv')">music−video+mtv</button>
         <button class="suggest-btn" onclick="setAnalogy('paris','france','england')">paris−france+england</button>
         <button class="suggest-btn" onclick="setAnalogy('soldier','war','game')">soldier−war+game</button>
       </div>
@@ -754,7 +754,7 @@
         <div class="concept-icon">🧮</div>
         <div class="concept-title">Vector Arithmetic</div>
         <div class="concept-desc">Relationships are encoded as directions, so you can do arithmetic on meaning. Classic example from Mikolov et al. 2013:</div>
-        <div class="formula-box">vec("king") − vec("man") + vec("woman")<br/>≈ vec("queen")</div>
+        <div class="formula-box">vec("music") − vec("video") + vec("mtv")<br/>≈ vec("queen")</div>
       </div>
     </div>
     <div class="card">
