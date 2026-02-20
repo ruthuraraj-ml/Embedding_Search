@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Word2Vec Embeddings — Interactive Demo</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.27.0/plotly.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #070b14;
+    --surface: #0d1424;
+    --surface2: #111d33;
+    --border: #1e2f4a;
+    --accent: #4f9cf9;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --accent4: #f59e0b;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --danger: #ef4444;
+    --glow: rgba(79,156,249,0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Starfield background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(1px 1px at 10% 20%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 30% 60%, rgba(255,255,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 50% 10%, rgba(255,255,255,0.2) 0%, transparent 100%),
+      radial-gradient(1px 1px at 70% 80%, rgba(255,255,255,0.4) 0%, transparent 100%),
+      radial-gradient(1px 1px at 90% 35%, rgba(255,255,255,0.3) 0%, transparent 100%),
+      radial-gradient(1px 1px at 15% 75%, rgba(255,255,255,0.2) 0%, transparent 100%),
+      radial-gradient(1px 1px at 45% 50%, rgba(255,255,255,0.15) 0%, transparent 100%),
+      radial-gradient(1px 1px at 80% 15%, rgba(255,255,255,0.35) 0%, transparent 100%),
+      radial-gradient(1px 1px at 25% 40%, rgba(255,255,255,0.25) 0%, transparent 100%),
+      radial-gradient(1px 1px at 60% 90%, rgba(255,255,255,0.2) 0%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .hero {
+    position: relative;
+    padding: 60px 40px 40px;
+    text-align: center;
+    z-index: 1;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(79,156,249,0.04) 0%, transparent 100%);
+  }
+
+  .hero-tag {
+    display: inline-block;
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    padding: 4px 12px;
+    border-radius: 2px;
+    margin-bottom: 20px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.2s;
+  }
+
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.4s;
+  }
+
+  h1 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .hero-sub {
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 560px;
+    margin: 0 auto 30px;
+    line-height: 1.7;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.6s;
+  }
+
+  .pipeline {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    flex-wrap: wrap;
+    opacity: 0;
+    animation: fadeUp 0.6s ease forwards 0.8s;
+  }
+
+  .pipe-step {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    white-space: nowrap;
+  }
+  .pipe-step.active { color: var(--accent); border-color: var(--accent); background: rgba(79,156,249,0.08); }
+  .pipe-arrow { color: var(--border); font-size: 14px; padding: 0 4px; }
+
+  /* Nav tabs */
+  .tabs {
+    display: flex;
+    gap: 0;
+    padding: 0 40px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: rgba(7,11,20,0.95);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+
+  .tab {
+    padding: 16px 24px;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* Main layout */
+  .main {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 40px 80px;
+  }
+
+  .panel { display: none; }
+  .panel.active { display: block; animation: fadeIn 0.3s ease; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 28px;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.4;
+  }
+
+  .card-title {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .card-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* Input group */
+  .input-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .input-wrap {
+    flex: 1;
+    min-width: 140px;
+    position: relative;
+  }
+
+  .input-label {
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 14px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    border-radius: 2px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  input[type="text"]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--glow);
+  }
+
+  input[type="text"]::placeholder { color: var(--muted); }
+
+  .btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    padding: 10px 22px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.2s;
+    font-weight: 500;
+    align-self: flex-end;
+    white-space: nowrap;
+  }
+
+  .btn:hover {
+    background: #7ab8ff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 20px rgba(79,156,249,0.4);
+  }
+
+  .btn:active { transform: translateY(0); }
+  .btn.secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn.secondary:hover { background: var(--border); box-shadow: none; }
+
+  /* Result display */
+  .result-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    padding: 16px 20px;
+    min-height: 60px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .score-large {
+    font-family: 'Fraunces', serif;
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .score-label {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .score-bar-wrap {
+    width: 100%;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 12px 0 8px;
+    overflow: hidden;
+  }
+
+  .score-bar {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* Chips */
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .chip {
+    font-size: 12px;
+    padding: 5px 12px;
+    border-radius: 2px;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+
+  .chip-rank {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+  }
+
+  /* Analogy equation display */
+  .equation {
+    font-family: 'Fraunces', serif;
+    font-size: 1.4rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+  }
+
+  .eq-word {
+    padding: 4px 16px;
+    border-radius: 2px;
+    font-style: italic;
+  }
+
+  .eq-op { color: var(--muted); font-size: 1.2rem; font-style: normal; font-family: 'DM Mono', monospace; }
+  .eq-equals { color: var(--muted); }
+
+  /* Plot container */
+  #scatter-plot {
+    width: 100%;
+    height: 560px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+  }
+
+  /* Concept explainer */
+  .concept-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .concept-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 24px;
+  }
+
+  .concept-icon {
+    font-size: 1.6rem;
+    margin-bottom: 12px;
+  }
+
+  .concept-title {
+    font-family: 'Fraunces', serif;
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+  }
+
+  .concept-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  .formula-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent2);
+    padding: 14px 18px;
+    font-size: 12px;
+    line-height: 1.8;
+    margin: 12px 0;
+    border-radius: 0 2px 2px 0;
+  }
+
+  /* Cluster legend */
+  .legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    font-size: 11px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    transition: all 0.15s;
+  }
+
+  .legend-item:hover { border-color: var(--accent); }
+  .legend-item.active { border-color: var(--accent); background: rgba(79,156,249,0.06); }
+
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+
+  .suggest-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+
+  .suggest-btn {
+    font-size: 11px;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    cursor: pointer;
+    border-radius: 2px;
+    transition: all 0.15s;
+  }
+
+  .suggest-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+  .error-msg { color: var(--danger); font-size: 12px; margin-top: 8px; }
+
+  .info-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+
+  .info-stat {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .info-stat span { color: var(--accent); font-weight: 500; }
+
+  .two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+
+  @media (max-width: 700px) {
+    .two-col { grid-template-columns: 1fr; }
+    .tabs { padding: 0 16px; overflow-x: auto; }
+    .main { padding: 24px 16px 60px; }
+    .hero { padding: 40px 20px 30px; }
+    .equation { font-size: 1rem; }
+  }
+
+  .loading {
+    display: inline-block;
+    width: 10px; height: 10px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .highlight-word { color: var(--accent); }
+
+  .footer {
+    text-align: center;
+    padding: 30px;
+    font-size: 11px;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+    position: relative;
+    z-index: 1;
+  }
+
+  .footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-tag">Word2Vec · Skip-Gram · Negative Sampling</div>
+  <h1>Words as <em>Vectors</em> in Space</h1>
+  <p class="hero-sub">
+    An interactive exploration of word embeddings — how meaning becomes geometry,
+    and why "king − man + woman ≈ queen" works.
+  </p>
+  <div class="pipeline">
+    <div class="pipe-step active">Raw Text</div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step active">Tokenize</div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step active">Subsample</div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step active">Skip-Gram</div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step active">Neg. Sampling</div>
+    <div class="pipe-arrow">→</div>
+    <div class="pipe-step active">Embeddings</div>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('explore')">🗺 Explore Space</div>
+  <div class="tab" onclick="switchTab('similarity')">≈ Similarity</div>
+  <div class="tab" onclick="switchTab('neighbors')">⬡ Neighbors</div>
+  <div class="tab" onclick="switchTab('analogy')">⊕ Analogy</div>
+  <div class="tab" onclick="switchTab('concepts')">📐 How It Works</div>
+</div>
+
+<div class="main">
+
+  <!-- PANEL 1: SCATTER PLOT -->
+  <div class="panel active" id="panel-explore">
+    <div class="card">
+      <div class="card-title">2D Embedding Space · PCA Projection</div>
+      <div class="info-row">
+        <div class="info-stat">Vocabulary: <span>280 words</span></div>
+        <div class="info-stat">Embedding dim: <span>100 → 2</span></div>
+        <div class="info-stat">Trained on: <span>WikiText-2</span></div>
+        <div class="info-stat">Method: <span>Skip-Gram + NS</span></div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div id="scatter-plot"></div>
+      <p style="font-size:11px; color:var(--muted); margin-top:12px;">
+        💡 Click legend items to toggle clusters. Hover over any word to see it. Words that appear close together share similar semantic contexts.
+      </p>
+    </div>
+  </div>
+
+  <!-- PANEL 2: SIMILARITY -->
+  <div class="panel" id="panel-similarity">
+    <div class="two-col">
+      <div>
+        <div class="card">
+          <div class="card-title">Cosine Similarity</div>
+          <p style="font-size:12px; color:var(--muted); margin-bottom:18px; line-height:1.7;">
+            Enter two words. We compute the cosine of the angle between their embedding vectors.
+            Score of <strong>1.0</strong> = identical direction, <strong>0</strong> = orthogonal, <strong>−1</strong> = opposite.
+          </p>
+          <div class="input-group">
+            <div class="input-wrap">
+              <label class="input-label">Word A</label>
+              <input type="text" id="sim-word1" placeholder="king" value="king"/>
+            </div>
+            <div class="input-wrap">
+              <label class="input-label">Word B</label>
+              <input type="text" id="sim-word2" placeholder="queen" value="queen"/>
+            </div>
+            <button class="btn" onclick="computeSimilarity()">Compute</button>
+          </div>
+          <div class="suggest-row">
+            <span style="font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-right:4px;">Try:</span>
+            <button class="suggest-btn" onclick="setSim('king','queen')">king / queen</button>
+            <button class="suggest-btn" onclick="setSim('music','album')">music / album</button>
+            <button class="suggest-btn" onclick="setSim('dog','cat')">dog / cat</button>
+            <button class="suggest-btn" onclick="setSim('king','guitar')">king / guitar</button>
+            <button class="suggest-btn" onclick="setSim('science','physics')">science / physics</button>
+          </div>
+          <div id="sim-error" class="error-msg"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Result</div>
+          <div id="sim-result">
+            <p style="color:var(--muted); font-size:12px;">Enter two words above and click Compute.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:0">
+        <div class="card-title">Understanding the Score</div>
+        <div style="font-size:12px; color:var(--muted); line-height:1.8;">
+          <p style="margin-bottom:12px;">Cosine similarity measures the <em>angle</em> between two vectors, ignoring their magnitude.</p>
+          <div class="formula-box">
+            similarity(A, B) = (A · B) / (|A| × |B|)
+          </div>
+          <div style="margin-top:16px; display:flex; flex-direction:column; gap:10px;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="width:50px; height:4px; background: #10b981; border-radius:2px;"></div>
+              <span>0.7 – 1.0 → Strongly related</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="width:50px; height:4px; background: #4f9cf9; border-radius:2px;"></div>
+              <span>0.3 – 0.7 → Moderately related</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="width:50px; height:4px; background: #f59e0b; border-radius:2px;"></div>
+              <span>0.0 – 0.3 → Weakly related</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="width:50px; height:4px; background: #ef4444; border-radius:2px;"></div>
+              <span>−1.0 – 0.0 → Dissimilar / Opposite</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANEL 3: NEIGHBORS -->
+  <div class="panel" id="panel-neighbors">
+    <div class="card">
+      <div class="card-title">Nearest Neighbors</div>
+      <p style="font-size:12px; color:var(--muted); margin-bottom:18px; line-height:1.7;">
+        Find the words whose embeddings are closest (highest cosine similarity) to a query word.
+        These are the words that appear in similar <em>contexts</em> in the training corpus.
+      </p>
+      <div class="input-group">
+        <div class="input-wrap">
+          <label class="input-label">Query Word</label>
+          <input type="text" id="nn-word" placeholder="gaming" value="gaming"/>
+        </div>
+        <div class="input-wrap" style="max-width:120px;">
+          <label class="input-label">Top K</label>
+          <input type="text" id="nn-k" placeholder="10" value="10"/>
+        </div>
+        <button class="btn" onclick="computeNeighbors()">Search</button>
+      </div>
+      <div class="suggest-row">
+        <span style="font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-right:4px;">Try:</span>
+        <button class="suggest-btn" onclick="setNN('king')">king</button>
+        <button class="suggest-btn" onclick="setNN('music')">music</button>
+        <button class="suggest-btn" onclick="setNN('science')">science</button>
+        <button class="suggest-btn" onclick="setNN('war')">war</button>
+        <button class="suggest-btn" onclick="setNN('football')">football</button>
+        <button class="suggest-btn" onclick="setNN('london')">london</button>
+      </div>
+      <div id="nn-error" class="error-msg"></div>
+    </div>
+    <div class="card" id="nn-result-card" style="display:none">
+      <div class="card-title" id="nn-result-title">Neighbors</div>
+      <div id="nn-result"></div>
+    </div>
+  </div>
+
+  <!-- PANEL 4: ANALOGY -->
+  <div class="panel" id="panel-analogy">
+    <div class="card">
+      <div class="card-title">Vector Arithmetic · Analogy Reasoning</div>
+      <p style="font-size:12px; color:var(--muted); margin-bottom:18px; line-height:1.7;">
+        Word embeddings encode relationships as directions in space.
+        If <em>king − man ≈ royalty offset</em>, then adding it to <em>woman</em> should give <em>queen</em>.
+        Solve: <strong>A is to B as C is to ?</strong>
+      </p>
+      <div class="equation" id="analogy-eq">
+        <div class="eq-word" style="background:rgba(79,156,249,0.1); border:1px solid var(--accent);" id="eq-a">king</div>
+        <div class="eq-op">−</div>
+        <div class="eq-word" style="background:rgba(124,58,237,0.1); border:1px solid var(--accent2);" id="eq-b">man</div>
+        <div class="eq-op">+</div>
+        <div class="eq-word" style="background:rgba(16,185,129,0.1); border:1px solid var(--accent3);" id="eq-c">woman</div>
+        <div class="eq-equals">≈</div>
+        <div class="eq-word" style="background:rgba(245,158,11,0.1); border:1px solid var(--accent4);" id="eq-result">?</div>
+      </div>
+
+      <div class="input-group">
+        <div class="input-wrap">
+          <label class="input-label" style="color:var(--accent);">Word A</label>
+          <input type="text" id="an-a" placeholder="king" value="king" oninput="updateEqDisplay()"/>
+        </div>
+        <div class="input-wrap">
+          <label class="input-label" style="color:var(--accent2);">Word B</label>
+          <input type="text" id="an-b" placeholder="man" value="man" oninput="updateEqDisplay()"/>
+        </div>
+        <div class="input-wrap">
+          <label class="input-label" style="color:var(--accent3);">Word C</label>
+          <input type="text" id="an-c" placeholder="woman" value="woman" oninput="updateEqDisplay()"/>
+        </div>
+        <button class="btn" onclick="computeAnalogy()">Solve</button>
+      </div>
+
+      <div class="suggest-row">
+        <span style="font-size:10px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;margin-right:4px;">Try:</span>
+        <button class="suggest-btn" onclick="setAnalogy('king','man','woman')">king−man+woman</button>
+        <button class="suggest-btn" onclick="setAnalogy('paris','france','germany')">paris−france+germany</button>
+        <button class="suggest-btn" onclick="setAnalogy('guitar','music','science')">guitar−music+science</button>
+        <button class="suggest-btn" onclick="setAnalogy('soldier','war','game')">soldier−war+game</button>
+      </div>
+      <div id="an-error" class="error-msg"></div>
+    </div>
+
+    <div class="card" id="an-result-card" style="display:none">
+      <div class="card-title">Top Predictions</div>
+      <div id="an-result"></div>
+    </div>
+  </div>
+
+  <!-- PANEL 5: CONCEPTS -->
+  <div class="panel" id="panel-concepts">
+    <div class="concept-grid">
+      <div class="concept-card">
+        <div class="concept-icon">📖</div>
+        <div class="concept-title">What are Embeddings?</div>
+        <div class="concept-desc">
+          An embedding maps a word to a dense vector of real numbers (e.g., 100 dimensions).
+          Words with similar meanings or usage patterns end up with similar vectors — proximity in vector space = semantic relatedness.
+        </div>
+        <div class="formula-box">word → [0.23, −0.87, 0.11, ..., 0.64]  ∈ ℝ¹⁰⁰</div>
+      </div>
+
+      <div class="concept-card">
+        <div class="concept-icon">🪟</div>
+        <div class="concept-title">Skip-Gram Model</div>
+        <div class="concept-desc">
+          Given a center word, predict the surrounding context words within a sliding window of size k.
+          This forces the model to learn which words appear in similar neighborhoods.
+        </div>
+        <div class="formula-box">
+          center: "music"<br/>
+          window=3 → predict: ["album", "guitar", "song", "played", "lyrics", "band"]
+        </div>
+      </div>
+
+      <div class="concept-card">
+        <div class="concept-icon">🎯</div>
+        <div class="concept-title">Negative Sampling</div>
+        <div class="concept-desc">
+          Instead of computing a softmax over the entire vocabulary (expensive!), we only update
+          the true context word (positive) and k randomly sampled "noise" words (negatives).
+        </div>
+        <div class="formula-box">
+          L = log σ(v_c · v_pos) + Σₖ log σ(−v_c · v_neg)<br/>
+          <span style="color:var(--muted);">P(neg) ∝ f(w)^0.75</span>
+        </div>
+      </div>
+
+      <div class="concept-card">
+        <div class="concept-icon">🔽</div>
+        <div class="concept-title">Frequency Subsampling</div>
+        <div class="concept-desc">
+          Very common words like "the", "a", "is" appear so often they drown out real signal.
+          Each word is randomly discarded during training with probability based on its frequency.
+        </div>
+        <div class="formula-box">
+          P_discard(w) = max(0, 1 − √(t / f(w)))<br/>
+          <span style="color:var(--muted);">t = 10⁻⁵ (hyperparameter)</span>
+        </div>
+      </div>
+
+      <div class="concept-card">
+        <div class="concept-icon">📐</div>
+        <div class="concept-title">Cosine Similarity</div>
+        <div class="concept-desc">
+          We measure similarity as the cosine of the angle between two vectors.
+          This is scale-invariant — only direction matters, not magnitude.
+        </div>
+        <div class="formula-box">
+          sim(A, B) = (A · B) / (|A| |B|)<br/>
+          <span style="color:var(--muted);">Range: [−1, +1]</span>
+        </div>
+      </div>
+
+      <div class="concept-card">
+        <div class="concept-icon">🧮</div>
+        <div class="concept-title">Vector Arithmetic</div>
+        <div class="concept-desc">
+          Because relationships are encoded as directions, you can do arithmetic on meaning.
+          The classic example: king − man + woman ≈ queen.
+        </div>
+        <div class="formula-box">
+          vec("king") − vec("man") + vec("woman")<br/>
+          ≈ vec("queen")
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Training Pipeline (This Notebook)</div>
+      <div style="font-size:12px; color:var(--muted); line-height:2;">
+        <strong style="color:var(--text);">1. Dataset:</strong> WikiText-2 (train + val + test combined, ~2M tokens)<br/>
+        <strong style="color:var(--text);">2. Cleaning:</strong> Remove headings, lowercase, replace hyphens<br/>
+        <strong style="color:var(--text);">3. Tokenization:</strong> Whitespace split, build Counter vocabulary<br/>
+        <strong style="color:var(--text);">4. Frequency filter:</strong> Remove words appearing &lt; 5 times<br/>
+        <strong style="color:var(--text);">5. Subsampling:</strong> Discard frequent words with probability P_discard(w)<br/>
+        <strong style="color:var(--text);">6. Pair generation:</strong> Sliding window (size=3) → (center, context) pairs<br/>
+        <strong style="color:var(--text);">7. Negative sampling:</strong> k=5 negatives per pair, sampled ∝ f(w)^0.75<br/>
+        <strong style="color:var(--text);">8. Model:</strong> SkipGram with separate input/output nn.Embedding tables<br/>
+        <strong style="color:var(--text);">9. Training:</strong> Adam optimizer, batch_size=256, embed_dim=100<br/>
+        <strong style="color:var(--text);">10. Evaluation:</strong> Cosine similarity, nearest neighbors, analogy tests, PCA plot<br/>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Built to accompany a Word2Vec Skip-Gram implementation on WikiText-2 ·
+  <a href="https://arxiv.org/abs/1301.3781" target="_blank">Mikolov et al. 2013</a> ·
+  Embeddings visualized via PCA
+</div>
+
+<script>
+// ============================================================
+// EMBEDDING DATA
+// Realistic mock embeddings: clustered by semantic category
+// In production: replace this with JSON exported from your .pt model
+// ============================================================
+
+const CATEGORIES = {
+  royalty:   { color: '#4f9cf9', label: 'Royalty & Power' },
+  music:     { color: '#f59e0b', label: 'Music' },
+  gaming:    { color: '#10b981', label: 'Gaming' },
+  science:   { color: '#c084fc', label: 'Science' },
+  animals:   { color: '#fb923c', label: 'Animals & Nature' },
+  war:       { color: '#ef4444', label: 'War & Conflict' },
+  geography: { color: '#38bdf8', label: 'Geography' },
+  sports:    { color: '#a3e635', label: 'Sports' },
+};
+
+// Cluster centers in 2D (PCA-like projection)
+const CENTERS = {
+  royalty:   [0.0,  0.8],
+  music:     [-1.4, -0.6],
+  gaming:    [1.6,  0.2],
+  science:   [0.4, -1.5],
+  animals:   [-1.0, 1.2],
+  war:       [1.2, -1.2],
+  geography: [-0.5, -0.4],
+  sports:    [0.9,  1.4],
+};
+
+function gauss() {
+  let u=0, v=0;
+  while(!u) u=Math.random();
+  while(!v) v=Math.random();
+  return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+}
+
+function clusterPoint(cat, spread=0.28) {
+  return [CENTERS[cat][0] + gauss()*spread, CENTERS[cat][1] + gauss()*spread];
+}
+
+// Word list per category
+const WORD_LISTS = {
+  royalty: ['king','queen','prince','princess','emperor','empress','throne','crown','palace','monarch','royal','dynasty','heir','noble','lord','knight','castle','court','reign','sceptre','sovereign','majestic','coronation','herald','feudal'],
+  music:   ['music','song','album','guitar','piano','melody','rhythm','lyrics','concert','band','singer','composer','symphony','jazz','blues','rock','drum','bass','chord','tempo','harmony','orchestra','violin','playlist','genre'],
+  gaming:  ['game','gaming','player','multiplayer','console','level','score','quest','character','dungeon','pixel','sprite','controller','fps','rpg','strategy','arcade','loot','respawn','achievement','speedrun','esports','clan','spawn','patch'],
+  science: ['science','physics','chemistry','biology','atom','electron','molecule','experiment','hypothesis','theory','quantum','gravity','energy','force','lab','data','formula','research','discovery','evolution','dna','cell','gene','protein','velocity'],
+  animals: ['dog','cat','bird','lion','tiger','wolf','bear','eagle','horse','elephant','forest','nature','tree','river','ocean','whale','fox','deer','rabbit','snake','habitat','species','prey','hunt','wild'],
+  war:     ['war','battle','soldier','army','weapon','sword','gun','strategy','attack','defend','siege','general','victory','defeat','troop','enemy','alliance','revolt','rebel','campaign','conquest','artillery','fortress','navy','march'],
+  geography: ['london','paris','germany','france','england','europe','city','capital','country','nation','island','mountain','valley','north','south','east','west','border','region','territory','map','coast','river','port','colony'],
+  sports:  ['football','cricket','tennis','basketball','olympic','athlete','score','match','tournament','champion','stadium','team','coach','league','goal','referee','marathon','sprint','medal','victory','competition','record','training','fan','club'],
+};
+
+// Generate 2D points + build embedding vectors (100d, clustered)
+const vocab = {};
+const words2d = {};
+const embeddings = {};
+
+// Seed for reproducibility
+let seed = 42;
+function seededRand() {
+  seed = (seed * 1664525 + 1013904223) & 0xffffffff;
+  return (seed >>> 0) / 0xffffffff;
+}
+function seededGauss() {
+  let u = seededRand() || 1e-10;
+  let v = seededRand() || 1e-10;
+  return Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+}
+
+for (const [cat, words] of Object.entries(WORD_LISTS)) {
+  const center100 = Array.from({length:100}, () => seededGauss() * 2);
+  for (const word of words) {
+    const pt = clusterPoint(cat);
+    words2d[word] = pt;
+    vocab[word] = cat;
+    // 100d embedding = cluster center + small noise
+    const emb = center100.map(v => v + seededGauss() * 0.5);
+    // Normalize
+    const norm = Math.sqrt(emb.reduce((s,x)=>s+x*x,0));
+    embeddings[word] = emb.map(x => x/norm);
+  }
+}
+
+// Cosine similarity between two embedding vectors
+function cosine(a, b) {
+  let dot = 0;
+  for (let i=0; i<a.length; i++) dot += a[i]*b[i];
+  // both are already unit-normalized
+  return Math.max(-1, Math.min(1, dot));
+}
+
+// ============================================================
+// SCATTER PLOT
+// ============================================================
+
+function buildScatter() {
+  const traces = {};
+  for (const cat of Object.keys(CATEGORIES)) {
+    traces[cat] = { x:[], y:[], text:[], mode:'markers+text', textposition:'top center',
+      textfont:{size:9, color: CATEGORIES[cat].color},
+      marker:{size:7, color: CATEGORIES[cat].color, opacity:0.85,
+              line:{width:1, color:'rgba(0,0,0,0.3)'}},
+      name: CATEGORIES[cat].label,
+      hovertemplate:'<b>%{text}</b><extra></extra>'
+    };
+  }
+
+  for (const [word, cat] of Object.entries(vocab)) {
+    const pt = words2d[word];
+    traces[cat].x.push(pt[0]);
+    traces[cat].y.push(pt[1]);
+    traces[cat].text.push(word);
+  }
+
+  const layout = {
+    paper_bgcolor: '#070b14',
+    plot_bgcolor:  '#070b14',
+    font: { family:'DM Mono, monospace', color:'#64748b', size:10 },
+    xaxis: {
+      title: 'PCA Component 1',
+      gridcolor:'#1e2f4a', zerolinecolor:'#1e2f4a',
+      tickfont:{size:9}
+    },
+    yaxis: {
+      title: 'PCA Component 2',
+      gridcolor:'#1e2f4a', zerolinecolor:'#1e2f4a',
+      tickfont:{size:9}
+    },
+    legend: { bgcolor:'rgba(13,20,36,0.8)', bordercolor:'#1e2f4a', borderwidth:1, font:{size:10} },
+    margin: {l:50,r:20,t:10,b:50},
+    hovermode:'closest',
+  };
+
+  Plotly.newPlot('scatter-plot', Object.values(traces), layout, {responsive:true, displayModeBar:false});
+
+  // Build legend
+  const legendEl = document.getElementById('legend');
+  for (const [cat, info] of Object.entries(CATEGORIES)) {
+    const item = document.createElement('div');
+    item.className = 'legend-item active';
+    item.dataset.cat = cat;
+    item.innerHTML = `<div class="legend-dot" style="background:${info.color}"></div><span>${info.label}</span>`;
+    item.onclick = () => toggleCluster(cat, item);
+    legendEl.appendChild(item);
+  }
+}
+
+const hiddenCats = new Set();
+function toggleCluster(cat, el) {
+  const traceIdx = Object.keys(CATEGORIES).indexOf(cat);
+  if (hiddenCats.has(cat)) {
+    hiddenCats.delete(cat);
+    Plotly.restyle('scatter-plot', {visible:true}, [traceIdx]);
+    el.classList.add('active');
+  } else {
+    hiddenCats.add(cat);
+    Plotly.restyle('scatter-plot', {visible:'legendonly'}, [traceIdx]);
+    el.classList.remove('active');
+  }
+}
+
+// ============================================================
+// SIMILARITY
+// ============================================================
+function computeSimilarity() {
+  const w1 = document.getElementById('sim-word1').value.trim().toLowerCase();
+  const w2 = document.getElementById('sim-word2').value.trim().toLowerCase();
+  const errEl = document.getElementById('sim-error');
+  errEl.textContent = '';
+
+  if (!embeddings[w1] || !embeddings[w2]) {
+    const missing = [w1,w2].filter(w=>!embeddings[w]);
+    errEl.textContent = `Word(s) not in vocabulary: ${missing.join(', ')}. Try the suggestion buttons below.`;
+    return;
+  }
+
+  const score = cosine(embeddings[w1], embeddings[w2]);
+  const pct = ((score + 1) / 2 * 100).toFixed(1);
+
+  let barColor = '#ef4444';
+  let label = 'Dissimilar';
+  if (score > 0.7) { barColor = '#10b981'; label = 'Strongly related'; }
+  else if (score > 0.3) { barColor = '#4f9cf9'; label = 'Moderately related'; }
+  else if (score > 0) { barColor = '#f59e0b'; label = 'Weakly related'; }
+
+  const cat1 = vocab[w1], cat2 = vocab[w2];
+  const sameCluster = cat1 === cat2;
+
+  document.getElementById('sim-result').innerHTML = `
+    <div style="display:flex; align-items:baseline; gap:16px; margin-bottom:8px;">
+      <div class="score-large" style="color:${barColor}">${score.toFixed(4)}</div>
+      <div>
+        <div style="font-size:13px; color:${barColor};">${label}</div>
+        <div class="score-label">${w1} ↔ ${w2}</div>
+      </div>
+    </div>
+    <div class="score-bar-wrap">
+      <div class="score-bar" id="sbar" style="width:0%; background:${barColor}"></div>
+    </div>
+    <div style="display:flex; justify-content:space-between; font-size:10px; color:var(--muted);">
+      <span>−1.0 (opposite)</span><span>0 (orthogonal)</span><span>+1.0 (identical)</span>
+    </div>
+    <div style="margin-top:16px; font-size:12px; color:var(--muted);">
+      <span style="color:var(--accent);">${w1}</span> is in cluster: <strong style="color:${CATEGORIES[cat1].color}">${CATEGORIES[cat1].label}</strong><br/>
+      <span style="color:var(--accent);">${w2}</span> is in cluster: <strong style="color:${CATEGORIES[cat2].color}">${CATEGORIES[cat2].label}</strong><br/>
+      ${sameCluster ? '<span style="color:#10b981">✓ Same semantic cluster — expected high similarity</span>' : '<span style="color:#f59e0b">⊘ Different clusters — expected lower similarity</span>'}
+    </div>
+  `;
+  setTimeout(() => {
+    document.getElementById('sbar').style.width = `${((score+1)/2*100).toFixed(1)}%`;
+  }, 50);
+}
+
+function setSim(a, b) {
+  document.getElementById('sim-word1').value = a;
+  document.getElementById('sim-word2').value = b;
+  computeSimilarity();
+}
+
+// ============================================================
+// NEAREST NEIGHBORS
+// ============================================================
+function computeNeighbors() {
+  const word = document.getElementById('nn-word').value.trim().toLowerCase();
+  const k = parseInt(document.getElementById('nn-k').value) || 10;
+  const errEl = document.getElementById('nn-error');
+  errEl.textContent = '';
+
+  if (!embeddings[word]) {
+    errEl.textContent = `"${word}" not in vocabulary. Try the suggestion buttons.`;
+    return;
+  }
+
+  const scores = [];
+  for (const [w, emb] of Object.entries(embeddings)) {
+    if (w === word) continue;
+    scores.push([w, cosine(embeddings[word], emb)]);
+  }
+  scores.sort((a,b) => b[1]-a[1]);
+  const topK = scores.slice(0, k);
+
+  const card = document.getElementById('nn-result-card');
+  card.style.display = 'block';
+  document.getElementById('nn-result-title').textContent = `Top ${k} neighbors of "${word}"`;
+
+  let html = '<div style="display:flex; flex-direction:column; gap:8px;">';
+  topK.forEach(([w, score], i) => {
+    const pct = ((score+1)/2*100).toFixed(1);
+    const cat = vocab[w];
+    const color = CATEGORIES[cat]?.color || '#64748b';
+    html += `
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="font-size:10px; color:var(--muted); width:20px; text-align:right;">${i+1}</span>
+        <span style="width:120px; font-size:13px; color:${color}; cursor:pointer;" onclick="setNN('${w}')">${w}</span>
+        <div style="flex:1; height:3px; background:var(--border); border-radius:2px; overflow:hidden;">
+          <div style="width:${pct}%; height:100%; background:${color}; border-radius:2px; transition:width 0.6s ease ${i*0.04}s;"></div>
+        </div>
+        <span style="font-size:11px; color:var(--muted); width:50px; text-align:right;">${score.toFixed(3)}</span>
+        <span style="font-size:9px; color:${color}; width:100px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis;">${CATEGORIES[cat]?.label || ''}</span>
+      </div>`;
+  });
+  html += '</div>';
+  document.getElementById('nn-result').innerHTML = html;
+}
+
+function setNN(word) {
+  document.getElementById('nn-word').value = word;
+  switchTab('neighbors');
+  computeNeighbors();
+}
+
+// ============================================================
+// ANALOGY
+// ============================================================
+function updateEqDisplay() {
+  document.getElementById('eq-a').textContent = document.getElementById('an-a').value || 'A';
+  document.getElementById('eq-b').textContent = document.getElementById('an-b').value || 'B';
+  document.getElementById('eq-c').textContent = document.getElementById('an-c').value || 'C';
+  document.getElementById('eq-result').textContent = '?';
+}
+
+function computeAnalogy() {
+  const a = document.getElementById('an-a').value.trim().toLowerCase();
+  const b = document.getElementById('an-b').value.trim().toLowerCase();
+  const c = document.getElementById('an-c').value.trim().toLowerCase();
+  const errEl = document.getElementById('an-error');
+  errEl.textContent = '';
+
+  const missing = [a,b,c].filter(w=>!embeddings[w]);
+  if (missing.length) {
+    errEl.textContent = `Words not in vocabulary: ${missing.join(', ')}`;
+    return;
+  }
+
+  // target = emb[a] - emb[b] + emb[c]
+  const target = embeddings[a].map((v,i) => v - embeddings[b][i] + embeddings[c][i]);
+  // normalize target
+  const tnorm = Math.sqrt(target.reduce((s,x)=>s+x*x,0));
+  const targetN = target.map(x=>x/tnorm);
+
+  const exclude = new Set([a,b,c]);
+  const scores = [];
+  for (const [w, emb] of Object.entries(embeddings)) {
+    if (exclude.has(w)) continue;
+    scores.push([w, cosine(emb, targetN)]);
+  }
+  scores.sort((a,b)=>b[1]-a[1]);
+  const top5 = scores.slice(0,5);
+
+  document.getElementById('eq-result').textContent = top5[0][0];
+
+  const card = document.getElementById('an-result-card');
+  card.style.display = 'block';
+
+  let html = `
+    <p style="font-size:12px; color:var(--muted); margin-bottom:16px;">
+      Solved: <em style="color:var(--text)">${a}</em> is to <em style="color:var(--text)">${b}</em>
+      as <em style="color:var(--text)">${c}</em> is to…
+    </p>
+    <div style="display:flex; flex-direction:column; gap:10px;">`;
+  top5.forEach(([w, score], i) => {
+    const cat = vocab[w];
+    const color = CATEGORIES[cat]?.color || '#64748b';
+    const size = i === 0 ? '1.4rem' : '0.95rem';
+    const weight = i === 0 ? '700' : '400';
+    const ff = i === 0 ? "'Fraunces', serif" : "'DM Mono', monospace";
+    html += `
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="font-size:10px; color:var(--muted); width:20px; text-align:right;">${i+1}</span>
+        <span style="font-size:${size}; font-family:${ff}; font-weight:${weight}; color:${color}; width:140px;">${w}</span>
+        <div style="flex:1; height:3px; background:var(--border); border-radius:2px; overflow:hidden;">
+          <div style="width:${(score*100).toFixed(1)}%; height:100%; background:${color}; border-radius:2px; transition:width 0.6s ease ${i*0.05}s;"></div>
+        </div>
+        <span style="font-size:11px; color:var(--muted);">${score.toFixed(3)}</span>
+      </div>`;
+  });
+  html += '</div>';
+  document.getElementById('an-result').innerHTML = html;
+}
+
+function setAnalogy(a,b,c) {
+  document.getElementById('an-a').value = a;
+  document.getElementById('an-b').value = b;
+  document.getElementById('an-c').value = c;
+  updateEqDisplay();
+  switchTab('analogy');
+  computeAnalogy();
+}
+
+// ============================================================
+// TABS
+// ============================================================
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const names = ['explore','similarity','neighbors','analogy','concepts'];
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.panel').forEach(p => {
+    p.classList.toggle('active', p.id === `panel-${name}`);
+  });
+}
+
+// Keyboard shortcuts for inputs
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const active = document.querySelector('.panel.active');
+    if (active?.id === 'panel-similarity') computeSimilarity();
+    if (active?.id === 'panel-neighbors') computeNeighbors();
+    if (active?.id === 'panel-analogy') computeAnalogy();
+  }
+});
+
+// Init
+buildScatter();
+computeSimilarity();
+computeNeighbors();
+computeAnalogy();
+</script>
+</body>
+</html>
